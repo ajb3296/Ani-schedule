@@ -10,11 +10,14 @@ use tray_icon::{
 };
 use chrono::Local;
 
-fn main() {
+use tokio;
+
+#[tokio::main]
+async fn main() {
     let path = "./image/logo_128x128.png";
     let icon = load_icon(std::path::Path::new(path));
 
-    let tray_menu = get_tray_menu().unwrap();
+    let tray_menu = get_tray_menu().await.unwrap();
 
     let quit_i = MenuItem::new("종료", true, None);
     tray_menu.append(&quit_i);
@@ -47,10 +50,14 @@ fn main() {
         }
 
         if let Ok(event) = tray_channel.try_recv() {
+            // 86400초 = 24시간 이 넘으면 새로고침
             if last_update + 86400 < Local::now().timestamp() {
                 let mut tray_menu: Option<Box<dyn tray_icon::menu::ContextMenu>> = None;
 
-                let temp = get_tray_menu().unwrap();
+                let mut temp = Menu::new();
+                async {
+                    temp = get_tray_menu().await.unwrap();
+                };
                 temp.append(&quit_i);
                 tray_menu = Some(Box::new(temp));
 
@@ -62,7 +69,7 @@ fn main() {
     })
 }
 
-fn get_tray_menu() -> Result<Menu, reqwest::Error>{
+async fn get_tray_menu() -> Result<Menu, reqwest::Error>{
     let tray_menu = Menu::new();
 
     let wod = vec![
@@ -76,7 +83,7 @@ fn get_tray_menu() -> Result<Menu, reqwest::Error>{
     ];
 
     for (i, day) in wod.iter().enumerate() {
-        let ani_list = get_ani_schedule(i as i32);
+        let ani_list = get_ani_schedule(i as i32).await;
         match ani_list {
             Ok(ani_list) => {
                 let sub_menu = Submenu::new(day, true);
